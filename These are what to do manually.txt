@@ -1,0 +1,2 @@
+python3 ./myproject/manage.py puput_initial_data
+python3 ./myproject/manage.py createsuperuser

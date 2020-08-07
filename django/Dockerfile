@@ -1,4 +1,4 @@
-FROM yuhichyoc/wagtail
+FROM [yuhichyoc/wagtail]
 
 RUN django-admin startproject [django-project]
 COPY ./settings.py ./[django-project]/[django-project]/

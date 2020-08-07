@@ -7,5 +7,5 @@ docker run --name django \
     -p 8014:8014 \
     -p 8015:8015 \
     -d -i -t \
-    yuhichyoc/django \
+    [yuhichyoc/django] \
     /bin/bash

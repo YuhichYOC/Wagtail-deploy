@@ -1,6 +1,9 @@
 #!/bin/bash
 . ./common.sh
-find ./wagtail/ -name "*" -type f | replace "\[myproject\]"           ""
-find ./ -name "*" -type f         | replace "\[yuhichyoc/wagtail\]"   ""
-. ./wagtail/build.sh
-. ./wagtail/firstboot.sh
+find ./wagtail/ -name "*" -type f | replace "\[myproject\]"   ""
+TEST_VALUE=$(docker images | awk '("[yuhichyoc/wagtail]" == $1) {print $1}' | wc -l)
+if [ 0 -eq $TEST_VALUE ]; then
+  cd [/home/ubuntu/]wagtail
+  . ./build.sh
+  . ./firstboot.sh
+fi

@@ -1,6 +1,6 @@
 #!/bin/bash
 . ./common.sh
-find ./django/ -name "*" -type f | replace "\[django-project\]"              ""
+find ./django/ -name "*" -type f | replace "\[project-name\]"              ""
 find ./django/ -name "*" -type f | replace "\[app\]"                         ""
 find ./django/ -name "*" -type f | replace "\[host ip address\]"             ""
 find ./django/ -name "*" -type f | replace "\[django-project secret key\]"   $(randomsecretkey)

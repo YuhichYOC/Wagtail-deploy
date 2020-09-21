@@ -1,2 +1,2 @@
 #!/bin/bash
-docker exec -d wagtail python3 ./[myproject]/manage.py runserver 0.0.0.0:8000
+docker exec -d wagtail /bin/bash -c '/etc/init.d/nginx start && cd /[project-name] && uwsgi --socket [project-name].sock --module [project-name].wsgi --chmod-socket=666'

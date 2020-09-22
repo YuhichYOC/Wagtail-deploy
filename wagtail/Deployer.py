@@ -1,6 +1,7 @@
 import re
 
 PROJECT_NAME = [project-name]
+HOST_IP = [host-ip]
 
 class FileEntity:
 
@@ -32,6 +33,9 @@ class BasePyAppender:
 
   def setProjectName(self, arg):
     self.projectName = arg
+
+  def setHostIP(self, arg):
+    self.hostIP = arg
 
   def findInstalledAppsStart(self, prevContent):
     count = len(prevContent)
@@ -65,11 +69,43 @@ class BasePyAppender:
       newContent.append(prevContent[j])
     return newContent
 
+  def findAuthPasswordValidatorsStart(self, prevContent):
+    count = len(prevContent)
+    p = re.compile('^ *AUTH_PASSWORD_VALIDATORS = \[')
+    for i in range(count):
+      m = p.match(prevContent[i])
+      if m is not None:
+        break
+    return i
+
+  def findAuthPasswordValidatorsEnd(self, prevContent, i):
+    count = len(prevContent)
+    p = re.compile('^ *\]')
+    for j in range(i + 1, count):
+      m = p.match(prevContent[j])
+      if m is not None:
+        break
+    return j
+
+  def insertAllowedHost(self, prevContent):
+    count = len(prevContent):
+    newContent = []
+    pos = self.findAuthPasswordValidatorsEnd(prevContent, self.findAuthPasswordValidatorsStart(prevContent))
+    for i in range(pos):
+      newContent.append(prevContent[i])
+    newContent.append('')
+    newContent.append('# Hosts/domain names that are valid for this site; required if DEBUG is False')
+    newContent.append('# See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts')
+    newContent.append('ALLOWED_HOSTS = [' + self.hostIP + ']')
+    for j in range(pos + 1, count):
+      newContent.append(prevContent[j])
+    return newContent
+
   def run(self):
     fe = FileEntity()
     fe.setPath('/' + self.projectName + '/' + self.projectName + '/settings/base.py')
     fe.read()
-    newContent = self.insertInstalledApps(fe.getContent())
+    newContent = self.insertAllowedHost(self.insertInstalledApps(fe.getContent()))
     fe.setContent(newContent)
     fe.write()
 
@@ -126,6 +162,7 @@ class NginxConfAppender:
 if __name__ == '__main__':
   bpa = BasePyAppender()
   bpa.setProjectName(PROJECT_NAME)
+  bpa.setHostIP(HOST_IP)
   bpa.run()
   pncw = ProjectNginxConfWriter()
   pncw.setProjectName(PROJECT_NAME)

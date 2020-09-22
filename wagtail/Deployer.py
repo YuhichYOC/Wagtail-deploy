@@ -88,15 +88,16 @@ class BasePyAppender:
     return j
 
   def insertAllowedHost(self, prevContent):
-    count = len(prevContent):
+    count = len(prevContent)
     newContent = []
     pos = self.findAuthPasswordValidatorsEnd(prevContent, self.findAuthPasswordValidatorsStart(prevContent))
     for i in range(pos):
       newContent.append(prevContent[i])
+    newContent.append(']')
     newContent.append('')
     newContent.append('# Hosts/domain names that are valid for this site; required if DEBUG is False')
     newContent.append('# See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts')
-    newContent.append('ALLOWED_HOSTS = [' + self.hostIP + ']')
+    newContent.append('ALLOWED_HOSTS = ["' + self.hostIP + '"]')
     for j in range(pos + 1, count):
       newContent.append(prevContent[j])
     return newContent

@@ -5,7 +5,8 @@ RUN apt-get update \
 RUN pip3 install --upgrade pip
 RUN pip3 install Django
 RUN django-admin.py startproject [project-name]
-RUN pip3 install uwsgi
+RUN cd /[project-name]/ \
+    && pip3 install uwsgi
 RUN mkdir /etc/nginx/sites-available \
     && mkdir /etc/nginx/sites-enabled \
     && mkdir /[project-name]/media \

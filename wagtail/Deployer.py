@@ -2,177 +2,122 @@ import os
 import re
 import subprocess
 
-PROJECT_NAME = '[project-name]'
-HOST_IP = '[host-ip]'
-
-DJANGO_PROJECT_NAME = '[django-project-name]'
-
 
 class FileEntity:
 
     def __init__(self):
-        self.path = ''
+        self.f_path: str = ''
+        self.f_content: list = []
+        self.f_regexp_replace_file_pattern_indicator: str = 'pattern:'
+        self.f_regexp_replace_file_replacement_indicator: str = 'replacement:'
+
+    @property
+    def path(self) -> str:
+        return self.f_path
+
+    @property
+    def content(self) -> list:
+        return self.f_content
+
+    @property
+    def regexp_replace_file_pattern_indicator(self) -> str:
+        return self.f_regexp_replace_file_pattern_indicator
+
+    @property
+    def regexp_replace_file_replacement_indicator(self) -> str:
+        return self.f_regexp_replace_file_replacement_indicator
+
+    @path.setter
+    def path(self, arg: str):
+        self.f_path = arg
+
+    @content.setter
+    def content(self, arg: list):
+        self.f_content = arg
+
+    @regexp_replace_file_pattern_indicator.setter
+    def regexp_replace_file_pattern_indicator(self, arg: str):
+        self.f_regexp_replace_file_pattern_indicator = arg
+
+    @regexp_replace_file_replacement_indicator.setter
+    def regexp_replace_file_replacement_indicator(self, arg: str):
+        self.f_regexp_replace_file_replacement_indicator = arg
+
+    def read(self) -> None:
         self.content = []
-
-    def set_path(self, arg):
-        self.path = arg
-
-    def get_content(self):
-        return self.content
-
-    def set_content(self, arg):
-        self.content = arg
-
-    def read(self):
-        self.content.clear()
         with open(self.path, 'r') as f:
-            lines = f.read().split('\n')
-            for line in lines:
-                self.content.append(line)
+            self.content.extend(f.read().split('\n'))
+        return None
 
-    def write(self):
+    def write(self) -> None:
         with open(self.path, 'w') as f:
             for line in self.content:
                 f.write(line)
                 f.write('\n')
+        return None
 
+    def rewrite(self, content: list) -> None:
+        f = FileEntity()
+        f.path = self.path
+        f.content = content
+        f.write()
+        return None
 
-class WagtailStarter:
+    def append(self, content: list) -> None:
+        f = FileEntity()
+        f.path = self.path
+        f.read()
+        f.content.extend(content)
+        f.write()
+        return None
 
-    def __init__(self):
-        self.project_name = ''
-
-    def set_project_name(self, arg):
-        self.project_name = arg
-
-    def install_wagtail(self):
-        subprocess.call(['pip3', 'install', 'wagtail'])
-
-    def wagtail_start(self):
-        subprocess.call(['wagtail', 'start', self.project_name])
-
-    def create_media_directory(self):
-        subprocess.call(['mkdir', '/' + self.project_name + '/media'])
-
-    def create_static_directory(self):
-        subprocess.call(['mkdir', '/' + self.project_name + '/static'])
-
-    def collect_static(self):
-        os.chdir('/' + self.project_name)
-        subprocess.call(['python3', 'manage.py', 'collectstatic'])
-        os.chdir('/')
-
-    def run(self):
-        self.install_wagtail()
-        self.wagtail_start()
-        self.create_media_directory()
-        self.create_static_directory()
-        self.collect_static()
-
-
-class BasePyAppender:
-
-    def __init__(self):
-        self.project_name = ''
-        self.host_ip = ''
-
-    def set_project_name(self, arg):
-        self.project_name = arg
-
-    def set_host_ip(self, arg):
-        self.host_ip = arg
-
-    def find_installed_apps_start(self, prev_content):
-        count = len(prev_content)
-        p = re.compile('^ *INSTALLED_APPS = \\[')
-        i = 0
-        for i in range(count):
-            m = p.match(prev_content[i])
-            if m is not None:
-                break
-        return i
-
-    def find_installed_apps_end(self, prev_content, i):
-        count = len(prev_content)
-        p = re.compile('^ *]')
-        j = 0
-        for j in range(i + 1, count):
-            m = p.match(prev_content[j])
-            if m is not None:
-                break
-        return j - 1
-
-    def insert_installed_apps(self, prev_content):
-        count = len(prev_content)
+    def replace_regexp(self, pattern: str, replacement: str) -> None:
+        f = FileEntity()
+        f.path = self.path
+        f.read()
+        l_p = re.compile(pattern)
         new_content = []
-        pos = self.find_installed_apps_end(prev_content, self.find_installed_apps_start(prev_content))
-        for i in range(pos):
-            new_content.append(prev_content[i])
-        new_content.append('')
-        new_content.append('    \'wagtail.contrib.sitemaps\',')
-        new_content.append('    \'wagtail.contrib.routable_page\',')
-        new_content.append(']')
-        for j in range(pos + 2, count):
-            new_content.append(prev_content[j])
-        return new_content
+        for line in f.content:
+            l_m = l_p.match(line)
+            if l_m is not None:
+                new_content.append(replacement)
+            else:
+                new_content.append(line)
+        f.content = new_content
+        f.write()
+        return None
 
-    def find_auth_password_validators_start(self, prev_content):
-        count = len(prev_content)
-        p = re.compile('^ *AUTH_PASSWORD_VALIDATORS = \\[')
-        i = 0
-        for i in range(count):
-            m = p.match(prev_content[i])
-            if m is not None:
-                break
-        return i
+    def content_replace(self, pattern: str, replacement: str) -> None:
+        self.content = list(map(
+            lambda line:
+            line.replace(pattern, replacement),
+            self.content
+        ))
+        return None
 
-    def find_auth_password_validators_end(self, prev_content, i):
-        count = len(prev_content)
-        p = re.compile('^ *]')
-        j = 0
-        for j in range(i + 1, count):
-            m = p.match(prev_content[j])
-            if m is not None:
-                break
-        return j
-
-    def insert_allowed_host(self, prev_content):
-        count = len(prev_content)
-        new_content = []
-        pos = self.find_auth_password_validators_end(prev_content,
-                                                     self.find_auth_password_validators_start(prev_content))
-        for i in range(pos):
-            new_content.append(prev_content[i])
-        new_content.append(']')
-        new_content.append('')
-        new_content.append('# Hosts/domain names that are valid for this site; required if DEBUG is False')
-        new_content.append('# See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts')
-        new_content.append('ALLOWED_HOSTS = ["' + self.host_ip + '"]')
-        for j in range(pos + 1, count):
-            new_content.append(prev_content[j])
-        return new_content
-
-    def run(self):
-        fe = FileEntity()
-        fe.set_path('/' + self.project_name + '/' + self.project_name + '/settings/base.py')
-        fe.read()
-        new_content = self.insert_allowed_host(self.insert_installed_apps(fe.get_content()))
-        fe.set_content(new_content)
-        fe.write()
+    def content_replace_regexp(self, pattern_file_path: str) -> None:
+        patterns = FileEntity()
+        patterns.path = pattern_file_path
+        patterns.read()
+        pattern_from = len(self.regexp_replace_file_pattern_indicator)
+        for item in patterns.content:
+            pattern_to = item.find(self.regexp_replace_file_replacement_indicator)
+            replacement_from = \
+                item.find(self.regexp_replace_file_replacement_indicator) + \
+                len(self.regexp_replace_file_replacement_indicator)
+            pattern = item[pattern_from:pattern_to]
+            replacement = item[replacement_from:]
+            self.replace_regexp(pattern, replacement)
+        return None
 
 
-class ProjectNginxConfWriter:
+class ConfEditor:
 
     def __init__(self):
-        self.project_name = ''
-
-    def set_project_name(self, arg):
-        self.project_name = arg
-
-    def run(self):
-        content = [
+        self.f_nginx_sites_available_path = '/etc/nginx/sites-available/PROJECT_NAME_nginx.conf'
+        self.f_nginx_sites_available = [
             'upstream wagtail {',
-            '  server unix:///' + self.project_name + '/' + self.project_name + '.sock;',
+            '  server unix:///PROJECT_NAME/PROJECT_NAME.sock;',
             '}',
             'server {',
             '  listen 8000;',
@@ -180,72 +125,159 @@ class ProjectNginxConfWriter:
             '  charset utf-8;',
             '  client_max_body_size 75M;',
             '  location /media {',
-            '    alias /' + self.project_name + '/media;',
+            '    alias /PROJECT_NAME/media;',
             '  }',
             '  location /static {',
-            '    alias /' + self.project_name + '/static;',
+            '    alias /PROJECT_NAME/static;',
             '  }',
             '  location / {',
-            '    uwsgi_pass wagtail;',
-            '    include /' + self.project_name + '/uwsgi_params;',
+            '    uwsgi_pass django;',
+            '    include /PROJECT_NAME/uwsgi_params;',
             '  }',
-            '}'
+            '}',
         ]
-        to_path = '/etc/nginx/sites-available/' + self.project_name + '_nginx.conf'
+        self.f_nginx_conf_path = '/etc/nginx/nginx.conf'
+        self.f_nginx_conf_target_pattern = '^( *)include +/etc/nginx/conf\\.d/\\*\\.conf;'
+        self.f_nginx_conf_append = '    include /etc/nginx/sites-enabled/*;'
+
+    def edit_nginx_sites_available(self) -> None:
         fe = FileEntity()
-        fe.set_path(to_path)
-        fe.set_content(content)
+        fe.path = self.f_nginx_sites_available_path
+        fe.content = self.f_nginx_sites_available
         fe.write()
+        return None
+
+    def edit_nginx_conf(self) -> None:
+        fe = FileEntity()
+        fe.path = self.f_nginx_conf_path
+        fe.read()
+        p = re.compile(self.f_nginx_conf_target_pattern)
+        new_content = []
+        for line in fe.content:
+            new_content.append(line)
+            m = p.match(line)
+            if m is not None:
+                new_content.append(self.f_nginx_conf_append)
+        fe.content = new_content
+        fe.write()
+        return None
+
+    def run(self) -> None:
+        self.edit_nginx_sites_available()
+        self.edit_nginx_conf()
+        return None
 
 
-class PostProcesses:
+class BasePyEditor:
 
     def __init__(self):
-        self.project_name = ''
-        self.django_project_name = ''
+        self.f_settings_base_py_path = '/PROJECT_NAME/PROJECT_NAME/settings/base.py'
+        self.f_installed_apps_start_pattern = '^ *INSTALLED_APPS = \\['
+        self.f_installed_apps_end_pattern = '^ *]'
+        self.f_installed_apps_insert = [
+            '',
+            '    \'wagtail.contrib.sitemaps\',',
+            '    \'wagtail.contrib.routable_page\',',
+            ']',
+        ]
+        self.f_auth_password_validators_start_pattern = '^ *AUTH_PASSWORD_VALIDATORS = \\['
+        self.f_auth_password_validators_end_pattern = '^ *]'
+        self.f_allowed_host_insert = [
+            ']',
+            '',
+            '# Hosts/domain names that are valid for this site; required if DEBUG is False',
+            '# See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts',
+            'ALLOWED_HOSTS = ["HOST_IP"]',
+        ]
 
-    def set_project_name(self, arg):
-        self.project_name = arg
+    def find_installed_apps_start(self, prev_content: list) -> int:
+        count = len(prev_content)
+        p = re.compile(self.f_installed_apps_start_pattern)
+        i = 0
+        for i in range(count):
+            m = p.match(prev_content[i])
+            if m is not None:
+                break
+        return i
 
-    def set_django_project_name(self, arg):
-        self.django_project_name = arg
+    def find_installed_apps_end(self, prev_content: list, i: int) -> int:
+        count = len(prev_content)
+        p = re.compile(self.f_installed_apps_end_pattern)
+        j = 0
+        for j in range(i + 1, count):
+            m = p.match(prev_content[j])
+            if m is not None:
+                break
+        return j - 1
 
-    def requirements_install(self):
-        subprocess.call(['pip3', 'install', '-r', '/' + self.project_name + '/requirements.txt'])
+    def insert_installed_apps(self, prev_content: list) -> list:
+        count = len(prev_content)
+        new_content = []
+        pos = self.find_installed_apps_end(prev_content, self.find_installed_apps_start(prev_content))
+        for i in range(pos):
+            new_content.append(prev_content[i])
+        new_content.extend(self.f_installed_apps_insert)
+        for j in range(pos + 2, count):
+            new_content.append(prev_content[j])
+        return new_content
 
-    def run_migrate(self):
-        subprocess.call(['python3', '/' + self.project_name + '/manage.py', 'migrate'])
+    def find_auth_password_validators_start(self, prev_content: list) -> int:
+        count = len(prev_content)
+        p = re.compile(self.f_auth_password_validators_start_pattern)
+        i = 0
+        for i in range(count):
+            m = p.match(prev_content[i])
+            if m is not None:
+                break
+        return i
 
-    def copy_uwsgi_params(self):
-        subprocess.call(['cp', '/etc/nginx/uwsgi_params', '/' + self.project_name + '/'])
+    def find_auth_password_validators_end(self, prev_content: list, i: int) -> int:
+        count = len(prev_content)
+        p = re.compile(self.f_auth_password_validators_end_pattern)
+        j = 0
+        for j in range(i + 1, count):
+            m = p.match(prev_content[j])
+            if m is not None:
+                break
+        return j
 
-    def link_wagtail_to_enable(self):
-        subprocess.call(
-            ['ln', '-s', '/etc/nginx/sites-available/' + self.project_name + '_nginx.conf', '/etc/nginx/sites-enabled'])
+    def insert_allowed_host(self, prev_content: list) -> list:
+        count = len(prev_content)
+        new_content = []
+        pos = self.find_auth_password_validators_end(
+            prev_content,
+            self.find_auth_password_validators_start(prev_content)
+        )
+        for i in range(pos):
+            new_content.append(prev_content[i])
+        new_content.extend(self.f_allowed_host_insert)
+        for j in range(pos + 1, count):
+            new_content.append(prev_content[j])
+        return new_content
 
-    def unlink_django_from_enabled(self):
-        subprocess.call(['unlink', '/etc/nginx/sites-enabled/' + self.django_project_name + '_nginx.conf'])
-
-    def run(self):
-        self.requirements_install()
-        self.run_migrate()
-        self.copy_uwsgi_params()
-        self.link_wagtail_to_enable()
-        self.unlink_django_from_enabled()
+    def run(self) -> None:
+        fe = FileEntity()
+        fe.path = self.f_settings_base_py_path
+        fe.read()
+        new_content = fe.content
+        new_content = self.insert_installed_apps(new_content)
+        new_content = self.insert_allowed_host(new_content)
+        fe.content = new_content
+        fe.write()
+        return None
 
 
 if __name__ == '__main__':
-    ws = WagtailStarter()
-    ws.set_project_name(PROJECT_NAME)
-    ws.run()
-    bpa = BasePyAppender()
-    bpa.set_project_name(PROJECT_NAME)
-    bpa.set_host_ip(HOST_IP)
-    bpa.run()
-    pncw = ProjectNginxConfWriter()
-    pncw.set_project_name(PROJECT_NAME)
-    pncw.run()
-    pp = PostProcesses()
-    pp.set_project_name(PROJECT_NAME)
-    pp.set_django_project_name(DJANGO_PROJECT_NAME)
-    pp.run()
+    subprocess.call(['pip3', 'install', 'wagtail'])
+    subprocess.call(['wagtail', 'start', 'PROJECT_NAME'])
+    subprocess.call(['mkdir', '/PROJECT_NAME/media'])
+    subprocess.call(['mkdir', '/PROJECT_NAME/static'])
+    ConfEditor().run()
+    BasePyEditor().run()
+    subprocess.call(['pip3', 'install', '-r', '/PROJECT_NAME/requirements.txt'])
+    subprocess.call(['python3', '/PROJECT_NAME/manage.py', 'migrate'])
+    subprocess.call(['cp', '/etc/nginx/uwsgi_params', '/PROJECT_NAME/'])
+    subprocess.call(['ln', '-s', '/etc/nginx/sites-available/PROJECT_NAME_nginx.conf', '/etc/nginx/sites-enabled/'])
+    os.chdir('/PROJECT_NAME/')
+    subprocess.call(['python3', 'manage.py', 'collectstatic'])
+    subprocess.call(['systemctl', 'restart', 'nginx'])

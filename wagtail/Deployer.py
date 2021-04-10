@@ -114,75 +114,83 @@ class FileEntity:
 class ConfEditor:
 
     def __init__(self):
-        self.f_nginx_sites_available_path = '/etc/nginx/sites-available/PROJECT_NAME_nginx.conf'
-        self.f_nginx_sites_available = [
-            'upstream wagtail {',
-            '  server unix:///PROJECT_NAME/PROJECT_NAME.sock;',
-            '}',
-            'server {',
-            '  listen 8000;',
-            '  server_name example.com;',
-            '  charset utf-8;',
-            '  client_max_body_size 75M;',
-            '  location /media {',
-            '    alias /PROJECT_NAME/media;',
-            '  }',
-            '  location /static {',
-            '    alias /PROJECT_NAME/static;',
-            '  }',
-            '  location / {',
-            '    uwsgi_pass django;',
-            '    include /PROJECT_NAME/uwsgi_params;',
-            '  }',
-            '}',
+        self.NGINX_CONF_PATH = '/etc/nginx/conf.d/default.conf'
+        self.TARGET_START_PATTERN = '^( *)location'
+        self.TARGET_END_PATTERN = '^( *)\\}'
+        self.NGINX_CONF_REPLACE = [
+            '    charset utf-8;',
+            '    location /media {',
+            '      alias /PROJECT_NAME/media;',
+            '    }',
+            '    location /static {',
+            '      alias /PROJECT_NAME/static;',
+            '    }',
+            '    location / {',
+            '      uwsgi_pass unix:/PROJECT_NAME/PROJECT_NAME.sock;',
+            '      include /PROJECT_NAME/uwsgi_params;',
+            '    }',
         ]
-        self.f_nginx_conf_path = '/etc/nginx/nginx.conf'
-        self.f_nginx_conf_target_pattern = '^( *)include +/etc/nginx/conf\\.d/\\*\\.conf;'
-        self.f_nginx_conf_append = '    include /etc/nginx/sites-enabled/*;'
 
-    def edit_nginx_sites_available(self) -> None:
-        fe = FileEntity()
-        fe.path = self.f_nginx_sites_available_path
-        fe.content = self.f_nginx_sites_available
-        fe.write()
-        return None
+    def find_nginx_conf_target_start(self) -> int:
+        f = FileEntity()
+        f.path = self.NGINX_CONF_PATH
+        f.read()
+        p = re.compile(self.TARGET_START_PATTERN)
+        i = 0
+        for i in range(len(f.content)):
+            if p.match(f.content[i]) is not None:
+                break
+        return i
 
-    def edit_nginx_conf(self) -> None:
-        fe = FileEntity()
-        fe.path = self.f_nginx_conf_path
-        fe.read()
-        p = re.compile(self.f_nginx_conf_target_pattern)
+    def find_nginx_conf_target_end(self, i: int) -> int:
+        f = FileEntity()
+        f.path = self.NGINX_CONF_PATH
+        f.read()
+        p = re.compile(self.TARGET_END_PATTERN)
+        j = 0
+        for j in range(i + 1, len(f.content)):
+            if p.match(f.content[j]) is not None:
+                break
+        return j
+
+    def replace_nginx_conf(self) -> None:
+        start = self.find_nginx_conf_target_start()
+        f = FileEntity()
+        f.path = self.NGINX_CONF_PATH
+        f.read()
         new_content = []
-        for line in fe.content:
-            new_content.append(line)
-            m = p.match(line)
-            if m is not None:
-                new_content.append(self.f_nginx_conf_append)
-        fe.content = new_content
-        fe.write()
+        for i in range(len(f.content)):
+            if start == i:
+                new_content.extend(self.NGINX_CONF_REPLACE)
+                break
+            new_content.append(f.content[i])
+        end = self.find_nginx_conf_target_end(start)
+        for i in range(end + 1, len(f.content)):
+            new_content.append(f.content[i])
+        f.content = new_content
+        f.write()
         return None
 
     def run(self) -> None:
-        self.edit_nginx_sites_available()
-        self.edit_nginx_conf()
+        self.replace_nginx_conf()
         return None
 
 
 class BasePyEditor:
 
     def __init__(self):
-        self.f_settings_base_py_path = '/PROJECT_NAME/PROJECT_NAME/settings/base.py'
-        self.f_installed_apps_start_pattern = '^ *INSTALLED_APPS = \\['
-        self.f_installed_apps_end_pattern = '^ *]'
-        self.f_installed_apps_insert = [
+        self.BASE_PY_PATH = '/PROJECT_NAME/PROJECT_NAME/settings/base.py'
+        self.INSTALLED_APPS_START_PATTERN = '^ *INSTALLED_APPS = \\['
+        self.INSTALLED_APPS_END_PATTERN = '^ *]'
+        self.INSTALLED_APPS_INSERT = [
             '',
             '    \'wagtail.contrib.sitemaps\',',
             '    \'wagtail.contrib.routable_page\',',
             ']',
         ]
-        self.f_auth_password_validators_start_pattern = '^ *AUTH_PASSWORD_VALIDATORS = \\['
-        self.f_auth_password_validators_end_pattern = '^ *]'
-        self.f_allowed_host_insert = [
+        self.AUTH_PASSWORD_VALIDATORS_START_PATTERN = '^ *AUTH_PASSWORD_VALIDATORS = \\['
+        self.AUTH_PASSWORD_VALIDATORS_END_PATTERN = '^ *]'
+        self.ALLOWED_HOST_INSERT = [
             ']',
             '',
             '# Hosts/domain names that are valid for this site; required if DEBUG is False',
@@ -192,7 +200,7 @@ class BasePyEditor:
 
     def find_installed_apps_start(self, prev_content: list) -> int:
         count = len(prev_content)
-        p = re.compile(self.f_installed_apps_start_pattern)
+        p = re.compile(self.INSTALLED_APPS_START_PATTERN)
         i = 0
         for i in range(count):
             m = p.match(prev_content[i])
@@ -202,7 +210,7 @@ class BasePyEditor:
 
     def find_installed_apps_end(self, prev_content: list, i: int) -> int:
         count = len(prev_content)
-        p = re.compile(self.f_installed_apps_end_pattern)
+        p = re.compile(self.INSTALLED_APPS_END_PATTERN)
         j = 0
         for j in range(i + 1, count):
             m = p.match(prev_content[j])
@@ -216,14 +224,14 @@ class BasePyEditor:
         pos = self.find_installed_apps_end(prev_content, self.find_installed_apps_start(prev_content))
         for i in range(pos):
             new_content.append(prev_content[i])
-        new_content.extend(self.f_installed_apps_insert)
+        new_content.extend(self.INSTALLED_APPS_INSERT)
         for j in range(pos + 2, count):
             new_content.append(prev_content[j])
         return new_content
 
     def find_auth_password_validators_start(self, prev_content: list) -> int:
         count = len(prev_content)
-        p = re.compile(self.f_auth_password_validators_start_pattern)
+        p = re.compile(self.AUTH_PASSWORD_VALIDATORS_START_PATTERN)
         i = 0
         for i in range(count):
             m = p.match(prev_content[i])
@@ -233,7 +241,7 @@ class BasePyEditor:
 
     def find_auth_password_validators_end(self, prev_content: list, i: int) -> int:
         count = len(prev_content)
-        p = re.compile(self.f_auth_password_validators_end_pattern)
+        p = re.compile(self.AUTH_PASSWORD_VALIDATORS_END_PATTERN)
         j = 0
         for j in range(i + 1, count):
             m = p.match(prev_content[j])
@@ -250,14 +258,14 @@ class BasePyEditor:
         )
         for i in range(pos):
             new_content.append(prev_content[i])
-        new_content.extend(self.f_allowed_host_insert)
+        new_content.extend(self.ALLOWED_HOST_INSERT)
         for j in range(pos + 1, count):
             new_content.append(prev_content[j])
         return new_content
 
     def run(self) -> None:
         fe = FileEntity()
-        fe.path = self.f_settings_base_py_path
+        fe.path = self.BASE_PY_PATH
         fe.read()
         new_content = fe.content
         new_content = self.insert_installed_apps(new_content)
@@ -268,16 +276,14 @@ class BasePyEditor:
 
 
 if __name__ == '__main__':
-    subprocess.call(['pip3', 'install', 'wagtail'])
-    subprocess.call(['wagtail', 'start', 'PROJECT_NAME'])
-    subprocess.call(['mkdir', '/PROJECT_NAME/media'])
-    subprocess.call(['mkdir', '/PROJECT_NAME/static'])
+    subprocess.run(['pip3', 'install', 'wagtail'])
+    subprocess.run(['wagtail', 'start', 'PROJECT_NAME'])
+    subprocess.run(['mkdir', '/PROJECT_NAME/media'])
+    subprocess.run(['mkdir', '/PROJECT_NAME/static'])
     ConfEditor().run()
     BasePyEditor().run()
-    subprocess.call(['pip3', 'install', '-r', '/PROJECT_NAME/requirements.txt'])
-    subprocess.call(['python3', '/PROJECT_NAME/manage.py', 'migrate'])
-    subprocess.call(['cp', '/etc/nginx/uwsgi_params', '/PROJECT_NAME/'])
-    subprocess.call(['ln', '-s', '/etc/nginx/sites-available/PROJECT_NAME_nginx.conf', '/etc/nginx/sites-enabled/'])
+    subprocess.run(['pip3', 'install', '-r', '/PROJECT_NAME/requirements.txt'])
+    subprocess.run(['python3', '/PROJECT_NAME/manage.py', 'migrate'])
+    subprocess.run(['cp', '/etc/nginx/uwsgi_params', '/PROJECT_NAME/'])
     os.chdir('/PROJECT_NAME/')
-    subprocess.call(['python3', 'manage.py', 'collectstatic'])
-    subprocess.call(['systemctl', 'restart', 'nginx'])
+    subprocess.run(['python3', 'manage.py', 'collectstatic'])

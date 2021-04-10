@@ -114,85 +114,93 @@ class FileEntity:
 class ConfEditor:
 
     def __init__(self):
-        self.f_nginx_sites_available_path = '/etc/nginx/sites-available/PROJECT_NAME_nginx.conf'
-        self.f_nginx_sites_available = [
-            'upstream django {',
-            '  server unix:///PROJECT_NAME/PROJECT_NAME.sock;',
-            '}',
-            'server {',
-            '  listen 8000;',
-            '  server_name example.com;',
-            '  charset utf-8;',
-            '  client_max_body_size 75M;',
-            '  location /media {',
-            '    alias /PROJECT_NAME/media;',
-            '  }',
-            '  location /static {',
-            '    alias /PROJECT_NAME/static;',
-            '  }',
-            '  location / {',
-            '    uwsgi_pass django;',
-            '    include /PROJECT_NAME/uwsgi_params;',
-            '  }',
-            '}',
+        self.NGINX_CONF_PATH = '/etc/nginx/conf.d/default.conf'
+        self.TARGET_START_PATTERN = '^( *)location'
+        self.TARGET_END_PATTERN = '^( *)\\}'
+        self.NGINX_CONF_REPLACE = [
+            '    charset utf-8;',
+            '    location /media {',
+            '      alias /PROJECT_NAME/media;',
+            '    }',
+            '    location /static {',
+            '      alias /PROJECT_NAME/static;',
+            '    }',
+            '    location / {',
+            '      uwsgi_pass unix:/PROJECT_NAME/PROJECT_NAME.sock;',
+            '      include /PROJECT_NAME/uwsgi_params;',
+            '    }',
         ]
-        self.f_nginx_conf_path = '/etc/nginx/conf.d/default.conf'
-        self.f_nginx_conf_target_pattern = '^}'
-        self.f_nginx_conf_append = '    include /etc/nginx/sites-enabled/*;'
 
-    def edit_nginx_sites_available(self) -> None:
-        fe = FileEntity()
-        fe.path = self.f_nginx_sites_available_path
-        fe.content = self.f_nginx_sites_available
-        fe.write()
-        return None
+    def find_nginx_conf_target_start(self) -> int:
+        f = FileEntity()
+        f.path = self.NGINX_CONF_PATH
+        f.read()
+        p = re.compile(self.TARGET_START_PATTERN)
+        i = 0
+        for i in range(len(f.content)):
+            if p.match(f.content[i]) is not None:
+                break
+        return i
 
-    def edit_nginx_conf(self) -> None:
-        fe = FileEntity()
-        fe.path = self.f_nginx_conf_path
-        fe.read()
-        p = re.compile(self.f_nginx_conf_target_pattern)
+    def find_nginx_conf_target_end(self, i: int) -> int:
+        f = FileEntity()
+        f.path = self.NGINX_CONF_PATH
+        f.read()
+        p = re.compile(self.TARGET_END_PATTERN)
+        j = 0
+        for j in range(i + 1, len(f.content)):
+            if p.match(f.content[j]) is not None:
+                break
+        return j
+
+    def replace_nginx_conf(self) -> None:
+        start = self.find_nginx_conf_target_start()
+        f = FileEntity()
+        f.path = self.NGINX_CONF_PATH
+        f.read()
         new_content = []
-        for line in fe.content:
-            m = p.match(line)
-            if m is not None:
-                new_content.append(self.f_nginx_conf_append)
-            new_content.append(line)
-        fe.content = new_content
-        fe.write()
+        for i in range(len(f.content)):
+            if start == i:
+                new_content.extend(self.NGINX_CONF_REPLACE)
+                break
+            new_content.append(f.content[i])
+        end = self.find_nginx_conf_target_end(start)
+        for i in range(end + 1, len(f.content)):
+            new_content.append(f.content[i])
+        f.content = new_content
+        f.write()
         return None
 
     def run(self) -> None:
-        self.edit_nginx_sites_available()
-        self.edit_nginx_conf()
+        self.replace_nginx_conf()
         return None
 
 
 class SettingsPyEditor:
 
     def __init__(self):
-        self.f_from_pattern = '^( *)from'
-        self.f_import_pattern = '^( *)import'
-        self.f_import_append = 'import os'
-        self.f_allowed_hosts_pattern = '^( *)(ALLOWED_HOSTS *= *\\[)'
-        self.f_static_url_pattern = '^( *)STATIC_URL *= *'
-        self.f_settings_py_path = '/PROJECT_NAME/PROJECT_NAME/settings.py'
+        self.FROM_PATTERN = '^( *)from'
+        self.IMPORT_PATTERN = '^( *)import'
+        self.IMPORT_APPEND = 'import os'
+        self.ALLOWED_HOSTS_PATTERN = '^( *)(ALLOWED_HOSTS *= *\\[)'
+        self.STATIC_URL_PATTERN = '^( *)STATIC_URL *= *'
+        self.SETTINGS_PY_PATH = '/PROJECT_NAME/PROJECT_NAME/settings.py'
 
     def insert_import_os(self, prev_content: list) -> list:
         count = len(prev_content)
         new_content = []
-        p_from = re.compile(self.f_from_pattern)
-        p_import = re.compile(self.f_import_pattern)
+        p_from = re.compile(self.FROM_PATTERN)
+        p_import = re.compile(self.IMPORT_PATTERN)
         i = 0
         for i in range(count):
             m_from = p_from.match(prev_content[i])
             m_import = p_import.match(prev_content[i])
             if m_from is not None:
-                new_content.append(m_from.group(1) + self.f_import_append)
+                new_content.append(m_from.group(1) + self.IMPORT_APPEND)
                 new_content.append(prev_content[i])
                 break
             if m_import is not None:
-                new_content.append(m_import.group(1) + self.f_import_append)
+                new_content.append(m_import.group(1) + self.IMPORT_APPEND)
                 new_content.append(prev_content[i])
                 break
             new_content.append(prev_content[i])
@@ -202,7 +210,7 @@ class SettingsPyEditor:
 
     def insert_host_ip(self, prev_content) -> list:
         new_content = []
-        p = re.compile(self.f_allowed_hosts_pattern)
+        p = re.compile(self.ALLOWED_HOSTS_PATTERN)
         for line in prev_content:
             m = p.match(line)
             if m is not None:
@@ -214,7 +222,7 @@ class SettingsPyEditor:
     def insert_static_root_define(self, prev_content) -> list:
         count = len(prev_content)
         new_content = []
-        p = re.compile(self.f_static_url_pattern)
+        p = re.compile(self.STATIC_URL_PATTERN)
         i = 0
         for i in range(count):
             new_content.append(prev_content[i])
@@ -227,28 +235,24 @@ class SettingsPyEditor:
         return new_content
 
     def run(self) -> None:
-        fe = FileEntity()
-        fe.path = self.f_settings_py_path
-        fe.read()
-        new_content = fe.content
+        f = FileEntity()
+        f.path = self.SETTINGS_PY_PATH
+        f.read()
+        new_content = f.content
         new_content = self.insert_import_os(new_content)
         new_content = self.insert_host_ip(new_content)
         new_content = self.insert_static_root_define(new_content)
-        fe.content = new_content
-        fe.write()
+        f.content = new_content
+        f.write()
         return None
 
 
 if __name__ == '__main__':
-    subprocess.call(['django-admin.py', 'startproject', 'PROJECT_NAME'])
-    subprocess.call(['mkdir', '/etc/nginx/sites-available/'])
-    subprocess.call(['mkdir', '/etc/nginx/sites-enabled/'])
-    subprocess.call(['mkdir', '/PROJECT_NAME/media/'])
-    subprocess.call(['mkdir', '/PROJECT_NAME/static'])
+    subprocess.run(['django-admin.py', 'startproject', 'PROJECT_NAME'])
+    subprocess.run(['mkdir', '/PROJECT_NAME/media/'])
+    subprocess.run(['mkdir', '/PROJECT_NAME/static'])
     ConfEditor().run()
     SettingsPyEditor().run()
-    subprocess.call(['cp', '/etc/nginx/uwsgi_params', '/PROJECT_NAME/'])
-    subprocess.call(['ln', '-s', '/etc/nginx/sites-available/PROJECT_NAME_nginx.conf', '/etc/nginx/sites-enabled/'])
+    subprocess.run(['cp', '/etc/nginx/uwsgi_params', '/PROJECT_NAME/'])
     os.chdir('/PROJECT_NAME/')
-    subprocess.call(['python3', 'manage.py', 'collectstatic'])
-    subprocess.call(['systemctl', 'restart', 'nginx'])
+    subprocess.run(['python3', 'manage.py', 'collectstatic'])

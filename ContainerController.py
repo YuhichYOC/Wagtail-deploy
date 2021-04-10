@@ -8,9 +8,9 @@ WORKING_DIRECTORY = '/home/y/PycharmProjects/Wagtail-deploy/'
 DOCKER_FILE_DIR = 'django-required-package/'
 IMAGE_NAME = 'yuhichyoc/django-required-package'
 HOST_IP = '192.168.74.130'
-CONTAINER_NAME = 'django'
-PORT_NUMBER = '8001'
-PROJECT_NAME = 'mysite'
+CONTAINER_NAME = 'wagtail'
+PORT_NUMBER = '8002'
+PROJECT_NAME = 'myblog'
 
 
 def print_captured_stdout(arg: list) -> None:
@@ -28,10 +28,8 @@ class ContainerController:
         self.f_container_name: str = ''
         self.f_port_number: str = ''
         self.f_project_name: str = ''
-        self.START_COMMAND: str = \
-            "'/etc/init.d/nginx start && cd /{0}/ && uwsgi --socket {0}.sock --module {0}.wsgi --chmod-socket=666'"
-        self.RESTART_COMMAND: str = \
-            "'/etc/init.d/nginx restart && cd /{0}/ && uwsgi --socket {0}.sock --module {0}.wsgi --chmod-socket=666'"
+        self.NGINX_START: str = "/etc/init.d/nginx start"
+        self.START: str = "cd /{0}/ && uwsgi --socket {0}.sock --module {0}.wsgi --chmod-socket=666"
 
     @property
     def working_directory(self) -> str:
@@ -107,7 +105,7 @@ class ContainerController:
             return None
         print_captured_stdout(list(bytes.decode(subprocess.run([
             'docker', 'run', '--name', self.container_name,
-            '-p', self.port_number + ':8000',
+            '-p', self.port_number + ':80',
             '-d', '-i', '-t', self.image_name, '/bin/bash',
         ], capture_output=True).stdout).split('\n')))
         f = FileEntity.FileEntity()
@@ -123,6 +121,9 @@ class ContainerController:
         print_captured_stdout(list(bytes.decode(subprocess.run([
             'docker', 'exec', self.container_name, '/bin/bash', '-c', 'python3 Deployer.mod.py'
         ], capture_output=True).stdout).split('\n')))
+        print_captured_stdout(list(bytes.decode(subprocess.run([
+            'docker', 'stop', self.container_name
+        ], capture_output=True).stdout).split('\n')))
         return None
 
     def start(self) -> None:
@@ -134,8 +135,10 @@ class ContainerController:
             'docker', 'start', self.container_name
         ], capture_output=True).stdout).split('\n')))
         print_captured_stdout(list(bytes.decode(subprocess.run([
-            'docker', 'exec', '-d', self.container_name, '/bin/bash', '-c',
-            self.START_COMMAND.format(self.project_name),
+            'docker', 'exec', '-d', self.container_name, '/bin/bash', '-c', self.NGINX_START
+        ], capture_output=True).stdout).split('\n')))
+        print_captured_stdout(list(bytes.decode(subprocess.run([
+            'docker', 'exec', '-d', self.container_name, '/bin/bash', '-c', self.START.format(self.project_name)
         ], capture_output=True).stdout).split('\n')))
         return None
 
@@ -161,8 +164,10 @@ class ContainerController:
             'docker', 'start', self.container_name
         ], capture_output=True).stdout).split('\n')))
         print_captured_stdout(list(bytes.decode(subprocess.run([
-            'docker', 'exec', '-d', self.container_name, '/bin/bash', '-c',
-            self.RESTART_COMMAND.format(self.project_name),
+            'docker', 'exec', '-d', self.container_name, '/bin/bash', '-c', self.NGINX_START
+        ], capture_output=True).stdout).split('\n')))
+        print_captured_stdout(list(bytes.decode(subprocess.run([
+            'docker', 'exec', '-d', self.container_name, '/bin/bash', '-c', self.START.format(self.project_name)
         ], capture_output=True).stdout).split('\n')))
         return None
 
